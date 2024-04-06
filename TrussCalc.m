@@ -60,14 +60,63 @@ function TrussCalc(C, Sx, Sy, X, Y, L)
             fprintf('Reaction force S%d: %.3f\n', i - members, T(i));
         end
     end
+    
+    % Calculate Maximum Theoretical Load
+
+    % Identify load application points (assuming you start with some non-zero loads)
+    loadPoints = find(L ~= 0);
+
+    % Initialize variables for the loop
+    maxLoadReached = false;
+    loadIncrement = 1; % This is the load increment for each step
+
+    while ~maxLoadReached
+        % Increment load at all points identified for load application
+        L(loadPoints) = L(loadPoints) + loadIncrement;
+    
+        % Recalculate forces in the truss members with the incremented load
+        A = [Member_Matrix, Support_Forces]; % A matrix may need to be recalculated if supports are load-dependent
+        T = inv(A) * L; % T matrix for the new load
+    
+        % Check each member to see if it's under compression and nearing buckling
+        for i = 1:members
+            if T(i) < 0 % Member is in compression
+                % Check if the compressive force is equal to or greater than the buckling load
+                if abs(T(i)) >= Pcrit(i)
+                    maxLoadReached = true;
+                    % Subtract the last increment since it caused buckling
+                    L(loadPoints) = L(loadPoints) - loadIncrement;
+                    maxLoad = sum(L); % The maximum load before buckling
+                    break; % Exit the loop since maximum load has been found
+                end
+            end
+        end
+    
+        if maxLoadReached
+            break; % Exit the while loop since maximum load has been found
+        end
+    end
+
 
     cost = 10 * joints + totalLen; % Cost calculation
     fprintf('Cost of truss: $%.2f\n', cost);
-    fprintf('Theoretical max load/cost ratio in oz/$: %.4f\n', totalLoad / cost);
+    fprintf('Theoretical max load/cost ratio in oz/$: %.4f\n', maxLoad / cost);
+    
     
     % Display failure weights
-    disp('FAILURE WEIGHTS:');
+    disp('BUCKLING WEIGHTS:');
     for m = 1:members
         fprintf('Member %d:\t%.2f +/- %.2f oz\n', m, W_failure(m, 1), W_failure(m, 3) - W_failure(m, 2));
     end
+
+
+
+
+    
+    % Display the maximum theoretical load
+    fprintf('Maximum Theoretical Load before Buckling: %.2f oz\n', maxLoad);
+
+
+
+
 end
